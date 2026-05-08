@@ -9,7 +9,6 @@ from gevent import Greenlet
 import requests
 from locust.env import Environment
 from locust.runners import WorkerRunner
-from locust.clients import LocustResponse
 from locust.contrib.fasthttp import FastResponse
 
 
@@ -195,11 +194,11 @@ class JtlListener:
                    name: str, 
                    response_time: float, 
                    response_length: int, 
-                   response: Union[LocustResponse, FastResponse], 
+                   response: Union[requests.Response, FastResponse], 
                    context: Any, 
                    exception: Optional[Exception]) -> None:
         timestamp = int(round(time() * 1000))
-        response_message = str(response.reason) if "reason" in dir(response) else ""
+        response_message = str(getattr(response, 'reason', ''))
         status_code = response.status_code
         group_threads = str(self.runner.user_count)
         all_threads = str(self.runner.user_count)
@@ -342,7 +341,7 @@ class JtlListener:
                  name: str, 
                  response_time: float, 
                  response_length: int, 
-                 response: Union[LocustResponse, FastResponse], 
+                 response: Union[requests.Response, FastResponse], 
                  context: Any, 
                  exception: Optional[Exception], 
                  **kw) -> None:
