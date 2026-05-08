@@ -39,12 +39,12 @@ class JtlListener:
 
         # Listener configuration
         self.flush_size: int = 500  # how many records should be held before flushing to reporter
-        #
+        self.monitor_sent_interval: int = 30  # how often to send CPU usage and memory usage data (in seconds)
         
         # Advanced parameters
         self._batch_size_multiplier: int = 1  # base multiplier for batch size (flush_size * 1)
         self._batch_size_multiplier_growth_threshold: int = 4  # threshold for growing the batch size multiplier (batch_size * 4)
-        # 
+        
         
         # Initialize batch_size_multiplier
         self._current_batch_size_multiplier = self._batch_size_multiplier
@@ -325,7 +325,7 @@ class JtlListener:
             })
             if self._finished:
                 break
-            gevent.sleep(5)
+            gevent.sleep(self.monitor_sent_interval)
 
     def _user_count(self) -> None:
         while True:
@@ -397,12 +397,19 @@ class JtlListener:
         """Handle report to master event (worker side)."""
         data["results"] = self.results[:]
         self.results.clear()
-        data["cpu_usage"] = {
-            "name": client_id, 
-            "timestamp": int(round(time() * 1000)), 
-            "cpu": self._get_cpu(), 
-            "mem": self._get_memory_usage()
-        }
+
+        # Only send monitor data every n seconds instead of every report
+        current_time = time()
+        if not hasattr(self, '_last_cpu_report'):
+            self._last_cpu_report = 0
+        if current_time - self._last_cpu_report >= self.monitor_sent_interval:
+            data["cpu_usage"] = {
+                "name": client_id, 
+                "timestamp": int(round(time() * 1000)), 
+                "cpu": self._get_cpu(), 
+                "mem": self._get_memory_usage()
+            }
+            self._last_cpu_report = current_time
 
     def _worker_report(self, client_id: str, data: Dict[str, Any]) -> None:
         """Handle report from worker event (master side)."""
