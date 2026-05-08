@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from time import sleep, time
 from typing import List, Optional, Dict, Any, Union
 
@@ -51,8 +50,14 @@ class JtlListener:
         self._current_batch_size_multiplier = self._batch_size_multiplier
 
         self.env = env
-        self.environment_name = environment_name or self.env.host
+        self.environment_name = environment_name
         self.runner = self.env.runner
+        if self.runner is None:
+            logging.warning(
+                "JtlListener: No runner available (run_single_user mode). "
+                "JTL Reporter disabled for this environment."
+            )
+            return
         self.project_name = project_name
         self.scenario_name = scenario_name
         self.backend_url = backend_url
@@ -156,7 +161,7 @@ class JtlListener:
                 "x-access-token": self.api_token
             }
             payload: Dict[str, Any] = {
-                "environment": self.environment_name
+                "environment": self.environment_name or self.env.host
             }
             response = requests.post(
                 f"{self.be_url}/api/projects/{self.project_name}/scenarios/{self.scenario_name}/items/start-async",
@@ -365,9 +370,9 @@ class JtlListener:
                 self._background_master_monitor = gevent.spawn(self._master_cpu_monitor)
                 self._background_user = gevent.spawn(self._user_count)
 
-            except Exception:
-                logging.error("Error while starting the test")
-                sys.exit(1)
+            except Exception as e:
+                logging.error(f"JtlListener: Error while starting the test: {e}")
+                logging.warning("JtlListener: JTL Reporter disabled for this test run")
 
     def _test_stop(self, *a, **kw) -> None:
         if not self._is_worker():
